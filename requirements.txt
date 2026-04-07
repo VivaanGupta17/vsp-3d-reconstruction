@@ -1,0 +1,91 @@
+# ============================================================
+# VSP-3D: AI-Powered Virtual Surgical Planning
+# Requirements — Python 3.10+
+# ============================================================
+#
+# Install with: pip install -r requirements.txt
+#
+# CUDA note: Install PyTorch manually with CUDA support FIRST:
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# Then install remaining packages below.
+
+# ------------------------------------------------------------
+# Deep learning
+# ------------------------------------------------------------
+torch>=2.1.0
+torchvision>=0.16.0
+
+# ------------------------------------------------------------
+# Medical imaging
+# ------------------------------------------------------------
+SimpleITK>=2.3.0
+pydicom>=2.4.0
+nibabel>=5.1.0
+
+# ------------------------------------------------------------
+# 3D geometry & mesh processing
+# ------------------------------------------------------------
+trimesh>=4.0.0
+scikit-image>=0.22.0        # marching cubes (skimage.measure)
+pyvista>=0.43.0             # high-level VTK wrapper (optional but recommended)
+vtk>=9.2.0                  # 3D rendering backend
+open3d>=0.17.0              # alternative point cloud / mesh processing
+
+# ------------------------------------------------------------
+# Numerical / scientific
+# ------------------------------------------------------------
+numpy>=1.24.0
+scipy>=1.11.0
+scikit-learn>=1.3.0
+
+# ------------------------------------------------------------
+# Visualisation & reporting
+# ------------------------------------------------------------
+matplotlib>=3.7.0
+seaborn>=0.12.0
+Pillow>=10.0.0
+
+# ------------------------------------------------------------
+# Data / configuration
+# ------------------------------------------------------------
+PyYAML>=6.0.1
+pandas>=2.0.0
+tqdm>=4.66.0
+omegaconf>=2.3.0            # structured YAML configs (nnU-Net style)
+
+# ------------------------------------------------------------
+# Development & testing
+# ------------------------------------------------------------
+pytest>=7.4.0
+pytest-cov>=4.1.0
+black>=23.0.0               # code formatting
+isort>=5.12.0               # import sorting
+flake8>=6.1.0               # linting
+mypy>=1.6.0                 # type checking
+pre-commit>=3.4.0
+
+# ------------------------------------------------------------
+# Notebook support
+# ------------------------------------------------------------
+jupyter>=1.0.0
+ipywidgets>=8.1.0
+itkwidgets>=0.32.0          # VTK/ITK in Jupyter
+
+# ------------------------------------------------------------
+# Optional: registration
+# ------------------------------------------------------------
+# pycpd>=2.0.0               # Coherent Point Drift (pure Python)
+# probreg>=0.3.6             # Probabilistic registration (CPD, etc.)
+
+# ------------------------------------------------------------
+# Optional: shape models
+# ------------------------------------------------------------
+# vtk-dicom>=0.8.14          # DICOM to VTK conversion
+# vedo>=2023.5.0              # scientific visualisation
+
+# ------------------------------------------------------------
+# Optional: deep learning utilities
+# ------------------------------------------------------------
+monai>=1.3.0                # Medical Open Network for AI — transforms, metrics
+einops>=0.7.0               # Tensor reshaping for transformers
+timm>=0.9.0                 # PyTorch image models (encoder backbones)

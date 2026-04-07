@@ -1,0 +1,443 @@
+# ============================================================
+# VSP-3D: CMF Surgical Planning Pipeline Configuration
+# ============================================================
+# This YAML is the single source of truth for all pipeline
+# parameters. Override individual keys via CLI or a child config.
+
+# ------------------------------------------------------------------
+# Project metadata
+# ------------------------------------------------------------------
+project:
+  name: "vsp-3d-cmf"
+  version: "2.0.0"
+  description: "AI-powered CMF virtual surgical planning"
+  output_dir: "outputs/"
+  log_level: "INFO"   # DEBUG | INFO | WARNING | ERROR
+
+# ------------------------------------------------------------------
+# Dataset configuration
+# ------------------------------------------------------------------
+dataset:
+  # Root directory containing patient subdirectories
+  data_root: "data/"
+  train_split: 0.70
+  val_split: 0.15
+  test_split: 0.15
+  random_seed: 42
+
+  # Supported modalities
+  modalities:
+    - CT
+    - CBCT
+
+  # Per-dataset configurations
+  totalsegmentator:
+    path: "data/TotalSegmentator/"
+    n_cases: 1228
+    spacing_mm: [1.5, 1.5, 1.5]  # training resolution (coarser for speed)
+
+  ctpelvic1k:
+    path: "data/CTPelvic1K/"
+    n_cases: 1184
+    spacing_mm: [1.0, 1.0, 1.0]
+
+  internal_cmf:
+    path: "data/internal_cmf/"
+    n_cases: 247
+    spacing_mm: [0.5, 0.5, 0.5]
+    modality: CBCT
+
+# ------------------------------------------------------------------
+# DICOM preprocessing
+# ------------------------------------------------------------------
+preprocessing:
+  # Isotropic resampling target
+  target_spacing_mm: 0.5
+
+  # Interpolation for volume (linear) and label maps (nearest-neighbor)
+  volume_interpolation: "linear"
+  label_interpolation: "nearest"
+
+  # HU window for bone imaging
+  clip_hu_low: -200.0
+  clip_hu_high: 2500.0
+
+  # CBCT bias field correction
+  apply_n4_bias_correction: true
+  n4_iterations: [50, 50, 30, 20]
+  n4_convergence_threshold: 0.001
+
+  # Gantry tilt correction (CT)
+  correct_gantry_tilt: true
+
+  # FOV standardisation (mm; null = no crop)
+  target_fov_mm: 200.0
+
+  # Orientation normalisation
+  resample_to_ras: true
+
+  # Metal artifact reduction (CBCT)
+  apply_mar: true
+  mar_blend_weight: 0.85
+
+# ------------------------------------------------------------------
+# Segmentation model (3D U-Net)
+# ------------------------------------------------------------------
+segmentation:
+  model_type: "UNet3D"          # UNet3D | nnUNet
+  checkpoint: "models/bone_segmentor_v2.pt"
+  cmf_checkpoint: "models/mandible_segmentor_v2_coarse.pt"
+  cmf_fine_checkpoint: "models/mandible_segmentor_v2_fine.pt"
+
+  # Architecture
+  base_channels: 32
+  max_channels: 320
+  depth: 4
+  deep_supervision: true
+
+  # Inference
+  patch_size: [128, 128, 128]
+  step_size: 0.5               # sliding window overlap fraction
+  use_gaussian_weighting: true
+  gaussian_sigma_scale: 0.125
+  mixed_precision: true
+
+  # Post-processing
+  min_component_voxels: 500
+  apply_morphological_closing: true
+  closing_radius: 2
+
+  # CMF-specific
+  cmf_coarse_patch_size: [96, 96, 96]
+  cmf_fine_patch_size: [128, 128, 128]
+  roi_padding_mm: 20.0
+
+  # Class definitions
+  classes:
+    bone:
+      0: background
+      1: cortical_bone
+      2: cancellous_bone
+      3: teeth
+      4: soft_tissue
+    cmf:
+      0:  background
+      1:  mandible_corpus
+      2:  mandible_ramus
+      3:  mandibular_condyle
+      4:  mandibular_coronoid
+      5:  mandibular_symphysis
+      6:  mandibular_canal
+      7:  maxilla_body
+      8:  maxilla_alveolar
+      9:  hard_palate
+      10: zygomatic_body
+      11: zygomatic_arch
+      12: orbital_floor
+      13: teeth_upper
+      14: teeth_lower
+
+# ------------------------------------------------------------------
+# Mesh generation
+# ------------------------------------------------------------------
+mesh:
+  # Marching cubes
+  mc_level: 0.5
+  mc_step_size: 1
+  mc_allow_degenerate: false
+
+  # Smoothing: "laplacian" | "taubin" | "none"
+  smoothing_method: "taubin"
+  taubin_iterations: 50
+  taubin_lambda: 0.63
+  taubin_mu: -0.64
+
+  # Decimation (fraction to remove; 0 = none)
+  target_reduction: 0.70
+
+  # Quality checks
+  check_self_intersections: false  # expensive; enable for QA
+  fix_normals: true
+  remove_degenerate: true
+
+  # Export
+  stl_binary: true
+  export_formats:
+    - stl
+    - obj
+
+# ------------------------------------------------------------------
+# Surface registration
+# ------------------------------------------------------------------
+registration:
+  icp:
+    max_iterations: 100
+    tolerance: 1.0e-6
+    max_correspondence_distance_mm: 10.0
+    outlier_fraction: 0.05
+    point_to_plane: true
+    subsample_pts: 20000
+
+  cpd:
+    max_iterations: 150
+    tolerance: 1.0e-5
+    beta: 2.0
+    lambda: 3.0
+    outlier_fraction: 0.1
+
+# ------------------------------------------------------------------
+# Landmark detection
+# ------------------------------------------------------------------
+landmarks:
+  checkpoint: "models/landmark_detector_cmf.pt"
+  input_shape: [128, 128, 128]
+  base_channels: 32
+  landmark_set: "CMF"   # "CMF" | "ORTHO" | "ALL"
+
+  cmf_landmarks:
+    - nasion
+    - sella
+    - orbitale_l
+    - orbitale_r
+    - porion_l
+    - porion_r
+    - ANS
+    - PNS
+    - A_point
+    - B_point
+    - pogonion
+    - menton
+    - gonion_l
+    - gonion_r
+    - condylion_l
+    - condylion_r
+
+  orthopedic_landmarks:
+    - femoral_head_l
+    - femoral_head_r
+    - acetabulum_center_l
+    - acetabulum_center_r
+    - tibial_plateau_center_l
+    - tibial_plateau_center_r
+    - knee_joint_center_l
+    - knee_joint_center_r
+
+# ------------------------------------------------------------------
+# Surgical planning
+# ------------------------------------------------------------------
+planning:
+  # Osteotomy procedures supported
+  procedures:
+    - orthognathic    # LeFort I + BSSO ± genioplasty
+    - lefort_i        # isolated maxillary surgery
+    - bsso            # isolated mandibular surgery
+    - genioplasty     # chin repositioning
+    - orbital         # orbital osteotomies
+
+  orthognathic:
+    # Target occlusal values
+    target_overjet_mm: 2.5
+    target_overbite_mm: 2.0
+    target_anb_deg: 2.0
+
+    # Safety limits
+    max_maxillary_advance_mm: 12.0
+    max_maxillary_impaction_mm: 8.0
+    max_mandibular_setback_mm: 10.0
+
+    # Midline correction threshold
+    midline_correction: true
+    midline_correction_threshold_mm: 2.0
+
+    # Soft tissue prediction
+    predict_soft_tissue: true
+
+  collision_detection:
+    enabled: true
+    clearance_mm: 0.5
+
+  symmetry_analysis:
+    enabled: true
+    asymmetry_threshold: 0.1
+
+# ------------------------------------------------------------------
+# Implant design
+# ------------------------------------------------------------------
+implant:
+  material: "Ti-6Al-4V"    # "Ti-6Al-4V" | "PEEK" | "Titanium-Mesh"
+  min_wall_thickness_mm: 1.5
+  max_wall_thickness_mm: 5.0
+
+  orbital_floor:
+    mirror_based: true
+    plate_thickness_mm: 0.5   # thin mesh for orbital floor
+    n_screws: 4
+    screw_diameter_mm: 2.0
+    min_bone_engagement_mm: 4.0
+
+  cranial_plate:
+    plate_thickness_mm: 1.5
+    n_screws: 6
+    screw_diameter_mm: 2.0
+
+  mandibular_plate:
+    plate_thickness_mm: 2.5
+    n_screws: 8
+    screw_diameter_mm: 2.4
+
+  ssm:
+    enabled: false
+    model_path: "models/ssm_mandible.pkl"
+    n_components: 20
+
+# ------------------------------------------------------------------
+# Training configuration
+# ------------------------------------------------------------------
+training:
+  # General
+  max_epochs: 1000
+  early_stopping_patience: 50
+  save_best_metric: "dice_mean"
+
+  # Optimiser
+  optimizer: "AdamW"
+  learning_rate: 3.0e-4
+  weight_decay: 1.0e-5
+  lr_scheduler: "cosine"      # "cosine" | "poly" | "step"
+  lr_scheduler_warmup: 50     # epochs
+
+  # Batch / patch
+  batch_size: 2
+  patch_size: [128, 128, 128]
+  num_workers: 8
+  pin_memory: true
+
+  # Loss function
+  loss: "dice_ce"             # "dice_ce" | "dice" | "ce" | "focal"
+  deep_supervision: true
+  deep_supervision_weights: [1.0, 0.5, 0.25, 0.125]  # finest → coarsest
+
+  # Mixed precision
+  mixed_precision: true
+
+  # Checkpointing
+  checkpoint_dir: "checkpoints/"
+  save_interval_epochs: 10
+
+  # Validation
+  val_interval: 5             # validate every N epochs
+  val_patches_per_case: 50
+
+# ------------------------------------------------------------------
+# Augmentation
+# ------------------------------------------------------------------
+augmentation:
+  # Spatial
+  random_rotation:
+    enabled: true
+    max_angle_deg: 20
+    probability: 0.8
+  random_flip:
+    enabled: true
+    axes: [2]               # left-right only
+    probability: 0.5
+  random_elastic:
+    enabled: true
+    sigma: 10
+    alpha: 300
+    probability: 0.3
+  random_scaling:
+    enabled: true
+    scale_range: [0.85, 1.15]
+    probability: 0.5
+
+  # Intensity
+  gaussian_noise:
+    enabled: true
+    std_range: [0, 50]
+    probability: 0.5
+  gaussian_blur:
+    enabled: true
+    sigma_range: [0.5, 1.5]
+    probability: 0.3
+  contrast_adjustment:
+    enabled: true
+    gamma_range: [0.75, 1.35]
+    probability: 0.5
+  bias_field:
+    enabled: true
+    order: 3
+    magnitude: 0.4
+    probability: 0.5     # especially important for CBCT
+  hu_offset:
+    enabled: true
+    offset_range: [-30, 30]
+    probability: 0.5
+
+  # Artefact simulation
+  metal_artifact:
+    enabled: true
+    probability: 0.3
+  partial_volume:
+    enabled: true
+    probability: 0.3
+
+# ------------------------------------------------------------------
+# Evaluation
+# ------------------------------------------------------------------
+evaluation:
+  # Segmentation
+  surface_distance_sampling: 10000
+  report_per_class: true
+
+  # Landmark detection
+  success_threshold_mm: [2.0, 4.0]
+
+  # Planning accuracy
+  n_planning_cases: 22     # number of cases in planning validation set
+
+  # 3D print quality
+  guide_fit_sampling: 5000
+
+  # Output
+  output_dir: "evaluation/"
+  save_reports: true
+  export_format: "json"    # "json" | "csv" | "xlsx"
+
+# ------------------------------------------------------------------
+# Visualisation
+# ------------------------------------------------------------------
+visualisation:
+  window_size: [1400, 900]
+  background_color: [0.12, 0.12, 0.18]
+  off_screen: false
+  screenshot_magnification: 2
+
+  # CT slice rendering
+  default_window_level:
+    bone:        [1500, 400]
+    soft_tissue: [400, 40]
+
+  # Video export
+  video:
+    n_frames: 120
+    fps: 30
+    rotation_axis: "y"
+
+# ------------------------------------------------------------------
+# Export / clinical output
+# ------------------------------------------------------------------
+export:
+  output_dir: "outputs/stl/"
+  stl_binary: true
+  generate_cutting_guides: true
+  generate_positioning_splints: false
+  nest_for_printing: true
+  build_volume_mm: [200, 200, 200]
+
+  # DICOM RT-Struct export
+  export_rt_struct: false
+
+  # Report generation
+  generate_pdf_report: false
+  report_template: "templates/surgical_report.html"
