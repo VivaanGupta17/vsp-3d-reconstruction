@@ -602,3 +602,5 @@ if __name__ == "__main__":
 
     logger.info("LandmarkDetector self-test passed.")
     sys.exit(0)
+
+LANDMARK_TOLERANCE_MM = 2.0  # clinical acceptance threshold
