@@ -574,3 +574,5 @@ if __name__ == "__main__":
 
     logger.info("MeshGenerator self-test passed.")
     sys.exit(0)
+
+DEFAULT_DECIMATION_RATIO = 0.5
