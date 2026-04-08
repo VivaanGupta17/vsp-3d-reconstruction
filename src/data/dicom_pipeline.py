@@ -703,3 +703,31 @@ if __name__ == "__main__":
 
     logger.info("DICOMPipeline self-test passed.")
     sys.exit(0)
+
+
+def extract_tiles_with_progress(volume, tile_size=(64, 64, 64), stride=32):
+    """
+    Extract overlapping 3D tiles from a volume with a tqdm progress bar.
+    Useful for monitoring long preprocessing runs on large CT scans.
+    """
+    import numpy as np
+    try:
+        from tqdm import tqdm
+    except ImportError:
+        def tqdm(x, **kw): return x
+
+    D, H, W = volume.shape
+    td, th, tw = tile_size
+
+    coords = []
+    for d in range(0, D - td + 1, stride):
+        for h in range(0, H - th + 1, stride):
+            for w in range(0, W - tw + 1, stride):
+                coords.append((d, h, w))
+
+    tiles = []
+    for (d, h, w) in tqdm(coords, desc="extracting tiles", unit="tile"):
+        tile = volume[d:d+td, h:h+th, w:w+tw]
+        tiles.append(tile)
+
+    return tiles, coords
