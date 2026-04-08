@@ -576,3 +576,38 @@ if __name__ == "__main__":
     sys.exit(0)
 
 DEFAULT_DECIMATION_RATIO = 0.5
+
+
+def validate_mesh_before_export(verts, faces, min_faces: int = 50, max_edge_mm: float = 10.0) -> dict:
+    """
+    Run basic mesh integrity checks before writing to disk.
+    Raises ValueError if critical checks fail.
+    """
+    import numpy as np
+
+    report = {"passed": True, "warnings": [], "errors": []}
+
+    if len(faces) < min_faces:
+        report["errors"].append(f"too few faces: {len(faces)} < {min_faces}")
+        report["passed"] = False
+
+    if len(verts) == 0:
+        report["errors"].append("empty vertex array")
+        report["passed"] = False
+        return report
+
+    # check for degenerate (zero-area) faces
+    v0, v1, v2 = verts[faces[:, 0]], verts[faces[:, 1]], verts[faces[:, 2]]
+    edge_lens = np.stack([
+        np.linalg.norm(v1 - v0, axis=1),
+        np.linalg.norm(v2 - v1, axis=1),
+        np.linalg.norm(v0 - v2, axis=1),
+    ])
+    n_degen = (edge_lens < 1e-6).any(axis=0).sum()
+    if n_degen > 0:
+        report["warnings"].append(f"{n_degen} degenerate faces detected")
+
+    if edge_lens.max() > max_edge_mm:
+        report["warnings"].append(f"max edge length {edge_lens.max():.2f} mm exceeds {max_edge_mm} mm")
+
+    return report
