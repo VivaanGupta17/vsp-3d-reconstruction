@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 # Try VTK import — graceful degradation if unavailable
 try:
-    import vtk
+    import vtk  # requires VTK >= 9.2
     from vtk.util.numpy_support import numpy_to_vtk, vtk_to_numpy
     VTK_AVAILABLE = True
 except ImportError:
